@@ -4,6 +4,7 @@ from sqlalchemy import func
 from database import Saving, SessionLocal, User
 from sqlalchemy.orm import Session
 from datetime import datetime
+from database import Currency
 
 router = APIRouter()
 
@@ -23,17 +24,20 @@ def get_user(db: Session = Depends(get_db)):
 # Schema
 class SavingCreate(BaseModel):
     amount: float
+    currency: Currency
     description: str | None = None
     date: datetime = datetime.now()
 
 class SavingUpdate(BaseModel):
     amount: float | None = None
+    currency: Currency | None = None
     description: str | None = None
     date: datetime | None = None
 
 class SavingResponse(BaseModel):
     id: int
     amount: float
+    currency: Currency
     description: str | None = None
     date: datetime
     created_at: datetime
@@ -76,6 +80,7 @@ def add_saving(body: SavingCreate, db: Session = Depends(get_db), user: User = D
     saving = Saving(
         user_id=user.id,
         amount=body.amount,
+        currency=body.currency,
         description=body.description,
         date=body.date or datetime.now(),
     )
@@ -83,6 +88,12 @@ def add_saving(body: SavingCreate, db: Session = Depends(get_db), user: User = D
     db.commit()
     db.refresh(saving)
     return saving
+
+@router.delete("/")
+def delete_all_savings(db: Session = Depends(get_db), user: User = Depends(get_user)):
+    db.query(Saving).filter(Saving.user_id == user.id).delete()
+    db.commit()
+    return {"ok": True}
 
 @router.get("/{saving_id}", response_model=SavingResponse)
 def get_saving(saving_id: int, db: Session = Depends(get_db), user: User = Depends(get_user)):
@@ -111,4 +122,3 @@ def update_saving(body: SavingUpdate, saving_id: int, db: Session = Depends(get_
     db.commit()
     db.refresh(saving)
     return saving
-

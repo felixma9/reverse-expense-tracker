@@ -1,6 +1,7 @@
 from datetime import datetime
+from enum import StrEnum
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, create_engine
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Enum as SQLEnum, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
@@ -18,11 +19,18 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.now())
     savings = relationship("Saving", back_populates="user")
     
+class Currency(StrEnum):
+    CAD = "CAD"
+    USD = "USD"
+    EUR = "EUR"
+    JPY = "JPY"
+
 class Saving(Base):
     __tablename__ = "savings"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     amount = Column(Float, nullable=False)
+    currency = Column(SQLEnum(Currency, name="currency_type", native_enum=False), nullable=False, default=Currency.CAD)
     description = Column(String)
     date = Column(DateTime, default=datetime.now())
     created_at = Column(DateTime, default=datetime.now())
