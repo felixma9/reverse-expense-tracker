@@ -17,7 +17,6 @@ class User(Base):
     name = Column(String, nullable=False)
     username = Column(String, unique=True, nullable=False)
     hashed_password = Column(String, nullable=False)
-    email = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.now())
     savings = relationship("Saving", back_populates="user")
     
