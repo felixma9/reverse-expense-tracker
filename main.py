@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from database import init_db
-from routers import savings
+from routers import savings, auth
 
 app = FastAPI(
     title = "Reverse Expense Tracker",
@@ -27,6 +27,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(savings.router, prefix="/savings", tags=["savings"])
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
 
 @app.get("/health")
 async def health_check():
