@@ -4,9 +4,17 @@ from contextlib import asynccontextmanager
 from database import init_db
 from routers import savings, auth, user
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup code
+    init_db()
+    yield
+    # Cleanup code
+
 app = FastAPI(
     title = "Reverse Expense Tracker",
     version = "1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -16,15 +24,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup code
-    init_db()
-    yield
-    # Cleanup code
-
-app = FastAPI(lifespan=lifespan)
 
 app.include_router(savings.router, prefix="/savings", tags=["savings"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])

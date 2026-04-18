@@ -1,7 +1,7 @@
 # Schemas
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime
 
 from pydantic import BaseModel
 from database import User, Saving, get_db
@@ -30,14 +30,16 @@ class UserUpdate(BaseModel):
 
 # Endpoints
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def create_user(body: UserCreate, db: Session = Depends(get_db)):
-    # Check if username already exists
+def create_user(
+    body: UserCreate, 
+    db: Session=Depends(get_db)
+):
+    # Check if username already being used
     existing = db.query(User).filter(User.username == body.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
-    
-    print("password", body.password)
 
+    # If not, create user and update db
     user = User(
         name=body.name,
         username=body.username,
@@ -49,17 +51,18 @@ def create_user(body: UserCreate, db: Session = Depends(get_db)):
     return user
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: User=Depends(get_current_user)):
     return current_user
 
 @router.put("/me", response_model=UserResponse)
 def update_me(
     body: UserUpdate, 
-    current_user: User = Depends(get_current_user), 
-    db: Session = Depends(get_db)
+    current_user: User=Depends(get_current_user), 
+    db: Session=Depends(get_db)
 ):
     updates = body.model_dump(exclude_unset=True)
 
+    # If user is trying to update username, make sure the new username isn't already taken
     if "username" in updates:
         existing = db.query(User).filter(User.username == updates["username"]).first()
         if existing:
@@ -77,8 +80,8 @@ def update_me(
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 def delete_me(
-    current_user: User = Depends(get_current_user), 
-    db: Session = Depends(get_db)
+    current_user: User=Depends(get_current_user), 
+    db: Session=Depends(get_db)
 ):
     # Delete current user's savings
     db.query(Saving).filter(Saving.user_id == current_user.id).delete()
