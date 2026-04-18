@@ -4,10 +4,9 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from pydantic import BaseModel
-from database import User
+from database import User, get_db
 
-from routers.auth import hash_password
-from routers.savings import get_db
+from routers.auth import hash_password, get_current_user
 
 router = APIRouter()
 
@@ -22,6 +21,12 @@ class UserResponse(BaseModel):
     name: str
     username: str
     created_at: datetime
+
+class UserUpdate(BaseModel):
+    id: int | None
+    name: str | None
+    username: str | None
+    created_at: datetime | None
 
 # Endpoints
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -42,3 +47,30 @@ def create_user(body: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     return user
+
+@router.get("/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+@router.put("/me", response_model=UserResponse)
+def update_me(
+    body: UserUpdate, 
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    updates = body.model_dump(exclude_unset=True)
+
+    if "username" in updates:
+        existing = db.query(User).filter(User.username == updates["username"]).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already in use"
+            )
+
+    for key, value in updates.items():
+        setattr(current_user, key, value)
+
+    db.commit()
+    db.refresh(current_user)
+    return current_user
