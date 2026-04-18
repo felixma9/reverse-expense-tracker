@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from pydantic import BaseModel
-from database import User, get_db
+from database import User, Saving, get_db
 
 from routers.auth import hash_password, get_current_user
 
@@ -74,3 +74,15 @@ def update_me(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_me(
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    # Delete current user's savings
+    db.query(Saving).filter(Saving.user_id == current_user.id).delete()
+
+    db.delete(current_user)
+    db.commit()
+    return
