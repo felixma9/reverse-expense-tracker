@@ -5,7 +5,7 @@ from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Enu
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
-from config import settings
+from backend.config import settings
 
 engine = create_engine(
     url=settings.database_url, 
@@ -50,7 +50,7 @@ class Saving(Base):
     )
     currency = Column(
         SQLEnum(
-            enums=Currency, 
+            Currency, 
             name="currency_type", 
             native_enum=False
         ), 

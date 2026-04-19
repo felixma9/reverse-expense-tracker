@@ -7,8 +7,8 @@ from pydantic import BaseModel
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
-from database import User, get_db
-from config import settings
+from backend.database import User, get_db
+from backend.config import settings
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

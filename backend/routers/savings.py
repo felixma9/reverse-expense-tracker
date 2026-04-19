@@ -1,21 +1,28 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from database import Saving, User, Currency, get_db
-from routers.user import get_current_user
+from backend.database import Saving, User, Currency, get_db
+from backend.routers.user import get_current_user
 
 router = APIRouter()
+
+def not_in_future(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    if dt > datetime.now(UTC):
+        raise ValueError("Date cannot be in the future")
+    return dt
 
 # Schema
 class SavingCreate(BaseModel):
     amount: float
     currency: Currency
     description: str | None = None
-    date: datetime = datetime.now()
+    date: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class SavingUpdate(BaseModel):
     amount: float | None = None
@@ -66,8 +73,8 @@ def get_savings_this_month(
         db.query(Saving)
         .filter(
             Saving.user_id == user.id,
-            func.strftime("%m", Saving.created_at) == current_month,
-            func.strftime("%Y", Saving.created_at) == current_year,
+            func.strftime("%m", Saving.date) == current_month,
+            func.strftime("%Y", Saving.date) == current_year,
         )
         .with_entities(func.sum(Saving.amount))
         .scalar()
@@ -108,7 +115,14 @@ def get_saving(
     db: Session=Depends(get_db), 
     user: User=Depends(get_current_user)
 ):
-    return db.query(Saving).filter(Saving.id == saving_id, Saving.user_id == user.id).first()
+    saving = db.query(Saving).filter(Saving.id == saving_id, Saving.user_id == user.id).first()
+    if not saving:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Saving not found"
+        )
+
+    return saving
 
 @router.delete("/{saving_id}")
 def delete_saving(
