@@ -23,10 +23,8 @@ class UserResponse(BaseModel):
     created_at: datetime
 
 class UserUpdate(BaseModel):
-    id: int | None
     name: str | None
     username: str | None
-    created_at: datetime | None
 
 # Endpoints
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
