@@ -1,38 +1,47 @@
 import 'package:flutter/material.dart';
-import 'package:frontend/screens/register_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'savings_screen.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _nameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _loading = false;
   String? _error;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _register() async {
+    if (_passwordController.text != _confirmPasswordController.text) {
+      setState(() => _error = 'Passwords do not match');
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
     });
 
-    final success = await context.read<AuthProvider>().login(
-      username: _usernameController.text.trim(),
-      password: _passwordController.text,
+    final success = await context.read<AuthProvider>().register(
+      _nameController.text.trim(),
+      _usernameController.text.trim(),
+      _passwordController.text,
     );
 
     if (success && mounted) {
@@ -42,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } else {
       setState(() {
-        _error = 'Invalid email or password';
+        _error = 'Registration failed, please try again';
         _loading = false;
       });
     }
@@ -51,6 +60,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Create Account'),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -59,11 +71,20 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Reverse Expense Tracker',
+                'Create Account',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 48),
+              TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  border: OutlineInputBorder(),
+                ),
+                autocorrect: false,
+              ),
+              const SizedBox(height: 16),
               TextField(
                 controller: _usernameController,
                 decoration: const InputDecoration(
@@ -81,6 +102,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 obscureText: true,
               ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _confirmPasswordController,
+                decoration: const InputDecoration(
+                  labelText: 'Confirm Password',
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
+              ),
               const SizedBox(height: 24),
               if (_error != null)
                 Padding(
@@ -92,25 +122,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ElevatedButton(
-                onPressed: _loading ? null : _login,
+                onPressed: _loading ? null : _register,
                 child: _loading
-                  ? const CircularProgressIndicator()
-                  : const Text('Login'),
+                    ? const CircularProgressIndicator()
+                    : const Text('Create Account'),
               ),
               const SizedBox(height: 16),
               TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                  );
-                },
-                child: const Text('No account? Register here'),
-              )
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Already have an account? Login'),
+              ),
             ],
-          )
-        )
-      )
+          ),
+        ),
+      ),
     );
   }
 }

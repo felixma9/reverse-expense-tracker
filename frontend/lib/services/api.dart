@@ -117,15 +117,17 @@ class ApiService {
     return [];
   }
 
-  Future<Saving?> addSaving(double amount, String? description) async {
+  Future<Saving?> addSaving(double amount, String description, Currency currency) async {
     final response = await http.post(
       Uri.parse('${Config.baseUrl}/savings'),
       headers: await _authHeaders(),
       body: jsonEncode({
         'amount': amount,
         'description': description,
+        'currency': currency.toStr().toUpperCase(),
       }),
     );
+
     if (response.statusCode == 200) {
       return Saving.fromJson(jsonDecode(response.body));
     }

@@ -23,8 +23,8 @@ class AuthProvider extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> login(String email, String password) async {
-    final success = await _api.login(email, password);
+  Future<bool> login({required String username, required String password}) async {
+    final success = await _api.login(username, password);
     if (success) {
       final user = await _api.getMe();
       _currentUser = user;
@@ -33,9 +33,9 @@ class AuthProvider extends ChangeNotifier {
     return success;
   }
 
-  Future<bool> register(String name, String email, String password) async {
-    final success = await _api.register(name, email, password);
-    if (success) return await login(email, password);
+  Future<bool> register(String name, String username, String password) async {
+    final success = await _api.register(name, username, password);
+    if (success) return await login(username: username, password: password);
     return false;
   }
 
