@@ -469,13 +469,425 @@ class _AddSavingViewState extends State<AddSavingView> {
 
 // --- Savings List View ---
 
-class SavingsListView extends StatelessWidget {
+class SavingsListView extends StatefulWidget {
   const SavingsListView({super.key});
 
   @override
+  State<SavingsListView> createState() => _SavingsListViewState();
+}
+
+class _SavingsListViewState extends State<SavingsListView> {
+  final _api = ApiService();
+  List<Saving> _savings = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSavings();
+  }
+
+  Future<void> _fetchSavings() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final savings = await _api.getSavings();
+      savings.sort((a, b) => b.date.compareTo(a.date));
+      setState(() { _savings = savings; _loading = false; });
+    } catch (e) {
+      setState(() { _error = 'Failed to load savings'; _loading = false; });
+    }
+  }
+
+  double get _currentMonthTotal {
+    final now = DateTime.now();
+    return _savings
+        .where((s) => s.date.year == now.year && s.date.month == now.month)
+        .fold(0.0, (sum, s) => sum + s.amount);
+  }
+
+  Map<String, List<Saving>> get _groupedSavings {
+    final Map<String, List<Saving>> grouped = {};
+    for (final saving in _savings) {
+      final key = '${saving.date.year}-${saving.date.month.toString().padLeft(2, '0')}';
+      grouped.putIfAbsent(key, () => []).add(saving);
+    }
+    return grouped;
+  }
+
+  String _monthLabel(String key) {
+    final parts = key.split('-');
+    final year = parts[0];
+    final month = int.parse(parts[1]);
+    const names = ['January','February','March','April','May','June',
+                   'July','August','September','October','November','December'];
+    return '${names[month - 1]} $year';
+  }
+
+  String _dayLabel(DateTime date) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun',
+                    'Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${months[date.month - 1]} ${date.day}';
+  }
+
+  String _formatAmount(Saving saving) {
+    return '\$${saving.amount.toStringAsFixed(2)} ${saving.currency.name.toUpperCase()}';
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: Text('Savings List')),
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 24, 24, 4),
+            child: Text(
+              'Your savings',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+            ),
+          ),
+
+          // current month total card
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Saved so far this month',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '\$${_currentMonthTotal.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // list
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(_error!, style: const TextStyle(color: Colors.red)),
+                            const SizedBox(height: 12),
+                            TextButton(onPressed: _fetchSavings, child: const Text('Retry')),
+                          ],
+                        ),
+                      )
+                    : _savings.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No savings yet.\nTap + to log your first one.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _fetchSavings,
+                            child: ListView(
+                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                              children: _groupedSavings.entries.map((entry) {
+                                final monthSavings = entry.value;
+                                final monthTotal = monthSavings.fold(0.0, (sum, s) => sum + s.amount);
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 24),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // month header
+                                      Padding(
+                                        padding: const EdgeInsets.only(bottom: 10),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              _monthLabel(entry.key),
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            Text(
+                                              '\$${monthTotal.toStringAsFixed(2)}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey.shade500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                      // entries card
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(color: Colors.grey.shade200),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Column(
+                                          children: monthSavings.asMap().entries.map((e) {
+                                            final index = e.key;
+                                            final saving = e.value;
+                                            final isLast = index == monthSavings.length - 1;
+
+                                            return GestureDetector(
+                                              onTap: () => _openDetail(saving),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 14,
+                                                  vertical: 12,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  border: isLast
+                                                      ? null
+                                                      : Border(
+                                                          bottom: BorderSide(
+                                                            color: Colors.grey.shade200,
+                                                          ),
+                                                        ),
+                                                ),
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            _formatAmount(saving),
+                                                            style: const TextStyle(
+                                                              fontSize: 14,
+                                                              fontWeight: FontWeight.w500,
+                                                            ),
+                                                          ),
+                                                          if (saving.description != null) ...[
+                                                            const SizedBox(height: 3),
+                                                            Text(
+                                                              saving.description!,
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                color: Colors.grey.shade600,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                          const SizedBox(height: 2),
+                                                          Text(
+                                                            _dayLabel(saving.date),
+                                                            style: TextStyle(
+                                                              fontSize: 11,
+                                                              color: Colors.grey.shade400,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    const Icon(
+                                                      Icons.chevron_right,
+                                                      size: 16,
+                                                      color: Colors.grey,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openDetail(Saving saving) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SavingDetailSheet(
+        saving: saving,
+        onDeleted: _fetchSavings,
+        onUpdated: _fetchSavings,
+      ),
+    );
+  }
+}
+
+// --- Detail / Edit Bottom Sheet ---
+
+class SavingDetailSheet extends StatefulWidget {
+  final Saving saving;
+  final VoidCallback onDeleted;
+  final VoidCallback onUpdated;
+
+  const SavingDetailSheet({
+    super.key,
+    required this.saving,
+    required this.onDeleted,
+    required this.onUpdated,
+  });
+
+  @override
+  State<SavingDetailSheet> createState() => _SavingDetailSheetState();
+}
+
+class _SavingDetailSheetState extends State<SavingDetailSheet> {
+  late TextEditingController _amountController;
+  late TextEditingController _descriptionController;
+  bool _loading = false;
+  bool _editing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController = TextEditingController(
+      text: widget.saving.amount.toStringAsFixed(2),
+    );
+    _descriptionController = TextEditingController(
+      text: widget.saving.description ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final amount = double.tryParse(_amountController.text);
+    if (amount == null) return;
+
+    setState(() => _loading = true);
+    final api = ApiService();
+    final updated = await api.updateSaving(
+      widget.saving.id,
+      amount: amount,
+      description: _descriptionController.text,
+    );
+    setState(() => _loading = false);
+
+    if (updated != null && mounted) {
+      widget.onUpdated();
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _delete() async {
+    setState(() => _loading = true);
+    final api = ApiService();
+    final success = await api.deleteSaving(widget.saving.id);
+    setState(() => _loading = false);
+
+    if (success && mounted) {
+      widget.onDeleted();
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24, 24, 24,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Saving detail',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              TextButton(
+                onPressed: () => setState(() => _editing = !_editing),
+                child: Text(_editing ? 'Cancel' : 'Edit'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          if (_editing) ...[
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Amount',
+                border: OutlineInputBorder(),
+                prefixText: '\$',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _loading ? null : _save,
+              child: _loading
+                  ? const CircularProgressIndicator()
+                  : const Text('Save changes'),
+            ),
+          ] else ...[
+            _detailRow('Amount', '\$${widget.saving.amount.toStringAsFixed(2)} ${widget.saving.currency.name.toUpperCase()}'),
+            _detailRow('Description', widget.saving.description ?? '—'),
+            _detailRow('Date', '${widget.saving.date.day}/${widget.saving.date.month}/${widget.saving.date.year}'),
+          ],
+
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: _loading ? null : _delete,
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+        ],
+      ),
     );
   }
 }
